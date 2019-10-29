@@ -13,11 +13,9 @@ import models.vqvae as vqvae
 import models.wavernn1 as wr
 import utils.env as env
 import argparse
-import platform
 import re
 import utils.logger as logger
 import time
-import subprocess
 
 import config
 
@@ -47,8 +45,15 @@ model_type = args.model or 'vqvae'
 
 model_name = f'{model_type}.43.upconv'
 
+data_path = config.multi_speaker_data_path
+with open(f'{data_path}/index.pkl', 'rb') as f:
+    index = pickle.load(f)
+test_index = [x[-1:] if i < 2 * args.count else [] for i, x in enumerate(index)]
+train_index = [x[:-1] if i < args.count else x for i, x in enumerate(index)]
+dataset = env.MultispeakerDataset(train_index, data_path)
+
 if model_type == 'vqvae':
-    model_fn = lambda dataset: vqvae.Model(rnn_dims=896, fc_dims=896, global_decoder_cond_dims=dataset.num_speakers(),
+    model_fn = lambda dataset: vqvae.Model(rnn_dims=896, fc_dims=896, global_decoder_cond_dims=dataset[0][0].shape[0],
                   upsample_factors=(4, 4, 4), normalize_vq=True, noise_x=True, noise_y=True).cuda()
     dataset_type = 'multi'
 elif model_type == 'wavernn':
@@ -60,23 +65,6 @@ elif model_type == 'nc':
     dataset_type = 'single'
 else:
     sys.exit(f'Unknown model: {model_type}')
-
-if dataset_type == 'multi':
-    data_path = config.multi_speaker_data_path
-    with open(f'{data_path}/index.pkl', 'rb') as f:
-        index = pickle.load(f)
-    test_index = [x[-1:] if i < 2 * args.count else [] for i, x in enumerate(index)]
-    train_index = [x[:-1] if i < args.count else x for i, x in enumerate(index)]
-    dataset = env.MultispeakerDataset(train_index, data_path)
-elif dataset_type == 'single':
-    data_path = config.single_speaker_data_path
-    with open(f'{data_path}/dataset_ids.pkl', 'rb') as f:
-        index = pickle.load(f)
-    test_index = index[-args.count:] + index[:args.count]
-    train_index = index[:-args.count]
-    dataset = env.AudiobookDataset(train_index, data_path)
-else:
-    raise RuntimeError('bad dataset type')
 
 print(f'dataset size: {len(dataset)}')
 

@@ -1,0 +1,1 @@
+python preprocess_multispeaker.py vctk/wav48/ vctk_preprocessed/

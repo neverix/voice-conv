@@ -1,13 +1,8 @@
-import math, pickle, os
-import numpy as np
+import os
 import torch
-from torch.autograd import Variable
-from torch import optim
 from torch.utils.data import DataLoader
 import torch.nn as nn
-import torch.nn.functional as F
 from utils.dsp import *
-import sys
 import time
 from layers.overtone import Overtone
 from layers.vector_quant import VectorQuant
@@ -16,7 +11,8 @@ import utils.env as env
 import utils.logger as logger
 import random
 
-class Model(nn.Module) :
+
+class Model(nn.Module):
     def __init__(self, rnn_dims, fc_dims, global_decoder_cond_dims, upsample_factors, normalize_vq=False,
             noise_x=False, noise_y=False):
         super().__init__()
@@ -266,7 +262,7 @@ class Model(nn.Module) :
             np.save(paths.step_path(), step)
             logger.log_current_status()
             logger.log(f' <saved>; w[0][0] = {self.overtone.wavernn.gru.weight_ih_l0[0][0]}')
-            if k > saved_k + 50:
+            if k > saved_k + 15:
                 torch.save(self.state_dict(), paths.model_hist_path(step))
                 saved_k = k
                 self.do_generate(paths, step, dataset.path, valid_index)

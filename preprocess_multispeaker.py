@@ -4,9 +4,25 @@ import pickle
 import os
 import multiprocessing as mp
 from utils.dsp import *
+import random
+import resemblyzer
+
+voice_encoder = resemblyzer.VoiceEncoder()
+N_SAMPLES = 10
+
+
+# noinspection PyUnresolvedReferences
+def embed_speaker(speaker_path):
+    wavs = os.listdir(speaker_path)
+    samples = random.sample(wavs, N_SAMPLES)
+    sample_paths = (os.path.join(speaker_path, sample) for sample in samples)
+    wavs = [resemblyzer.preprocess_wav(sample_path) for sample_path in sample_paths]
+    return voice_encoder.embed_speaker(wavs)
+
 
 SEG_PATH = sys.argv[1]
 DATA_PATH = sys.argv[2]
+
 
 def get_files(path):
     next_speaker_id = 0
@@ -15,18 +31,21 @@ def get_files(path):
     for filename in glob.iglob(f'{path}/**/*.wav', recursive=True):
         speaker_name = filename.split('/')[-2]
         if speaker_name not in speaker_ids:
+            speaker_path = '/'.join(filename.split('/')[:-1])
             speaker_ids[speaker_name] = next_speaker_id
             next_speaker_id += 1
-            filenames.append([])
-        filenames[speaker_ids[speaker_name]].append(filename)
+            filenames.append((speaker_path, []))
+        filenames[speaker_ids[speaker_name]][1].append(filename)
 
     return filenames
 
-files = get_files(SEG_PATH)
+
+speakers = get_files(SEG_PATH)
+
 
 def process_file(i, path):
     dir = f'{DATA_PATH}/{i}'
-    name = path.split('/')[-1][:-4] # Drop .wav
+    name = path.split('/')[-1][:-4]  # Drop .wav
     filename = f'{dir}/{name}.npy'
     if os.path.exists(filename):
         print(f'{filename} already exists, skipping')
@@ -44,13 +63,17 @@ def process_file(i, path):
     np.save(filename, quant)
     return name
 
+
 index = []
-with mp.Pool(8) as pool:
-    for i, speaker in enumerate(files):
-        res = pool.starmap_async(process_file, [(i, path) for path in speaker]).get()
+embeddings = []
+with mp.Pool(mp.cpu_count()) as pool:
+    for i, (speaker, paths) in enumerate(speakers):
+        res = pool.starmap_async(process_file, [(i, path) for path in paths]).get()
         index.append([x for x in res if x])
+        embeddings.append(embed_speaker(speaker))
         print(f'Done processing speaker {i}')
 
 os.makedirs(DATA_PATH, exist_ok=True)
 with open(f'{DATA_PATH}/index.pkl', 'wb') as f:
     pickle.dump(index, f)
+np.save(f"{DATA_PATH}/embeddings.npy", np.array(embeddings))

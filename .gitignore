@@ -1,2 +1,11 @@
 __pycache__/
-/config.py
+vctk/
+speaker_embeddings.npy
+.ipynb_checkpoints/
+utils/.ipynb-checkpoints/
+.idea/
+vctk_preprocessed/
+log/
+model_checkpoints/
+model_outputs/
+test_audio/
